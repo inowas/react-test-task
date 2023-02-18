@@ -4,8 +4,8 @@ import FileUploader from "./components/FileUploader";
 import Papa from "papaparse";
 import TableView from "./components/TableView";
 import ChartView from './components/ChartView';
-const dayjs = require('dayjs')
-
+import dayjs from "dayjs";
+type IDateResolution = 'daily' | 'weekly' | 'monthly';
 interface IRawDataShape {
     date: string;
     precipitation: string;
@@ -28,7 +28,7 @@ function App() {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [viewType, setViewType] = useState<'table' | 'chart'>('table')
     const [data, setData] = useState<IDataShape[]>([]);
-    const [sortBy, setSortBy] = useState<'daily' | 'weekly' | 'monthly'>('daily')
+    const [sortBy, setSortBy] = useState<IDateResolution>('daily');
     useEffect(() => {
         if (!selectedFile) {
             return;
@@ -52,113 +52,65 @@ function App() {
     }, [selectedFile]);
 
 
-    function isLastDay(date: string) {
-        let d = new Date(date)
-        let test = new Date(d.getTime())
-        let month = test.getMonth();
-        test.setDate(test.getDate() + 1);
-        return test.getMonth() !== month;
-    }
-
-
+    const isLastDayOf = (dateString: string, dateResolution: IDateResolution) => {
+        if (dateResolution === 'daily')
+            return true;
+        if (dateResolution === 'weekly')
+            return dayjs(dateString).format('d') === '0';
+        return dayjs(dateString).format('DD') === dayjs(dateString).endOf('month').format('DD');
+    };
     const sortedData = useMemo(() => {
-
         if (sortBy === 'daily') {
             return data
-        } else {
-            let total_days = 0
-            let week_day = 0
-            let pr_sum = 0
-            let temp_max = 0
-            let temp_min = 0
-            let wind_sum = 0
-            let arr: IDataShape[] = []
-            let weather = {
-                fog: 0,
-                rain: 0,
-                snow: 0,
-                drizzle: 0,
-                sun: 0,
-            }
-
-            if (sortBy === 'weekly') {
-                for (let i = 0; i < data.length; i++) {
-                    total_days += 1
-                    week_day = Number(dayjs(data[i].date).format('d'))
-                    pr_sum += data[i].precipitation
-                    temp_max += data[i].temp_max
-                    temp_min += data[i].temp_min
-                    wind_sum += data[i].wind
-                    // @ts-ignore
-                    weather[data[i].weather] += 1
-
-                    if (week_day === 0) {
-                        // @ts-ignore
-                        // @ts-ignore
-                        // @ts-ignore
-                        // @ts-ignore
-                        // @ts-ignore
-                        arr.push({
-                            date: data[i].date,
-                            precipitation: Number((pr_sum / total_days).toFixed(2)),
-                            temp_max: Number((temp_max / total_days).toFixed(2)),
-                            temp_min: Number((temp_min / total_days).toFixed(2)),
-                            wind: Number((wind_sum / total_days).toFixed(2)),
-                            // @ts-ignore
-                            weather:  Object.keys(weather).reduce((a, b) => (weather[a] > weather[b] ? a : b)),
-                        });
-                        total_days = 0;
-                        pr_sum = 0.0;
-                        temp_max = 0.0;
-                        temp_min = 0.0;
-                        wind_sum = 0.0;
-                        weather.rain = 0;
-                        weather.snow = 0;
-                        weather.drizzle = 0;
-                        weather.sun = 0;
-                        weather.fog = 0;
-                    }
-                }
-            } else {
-                for (let i = 0; i < data.length; i++) {
-                    total_days += 1
-                    week_day = Number(dayjs(data[i].date).format('d'))
-                    pr_sum += data[i].precipitation
-                    temp_max += data[i].temp_max
-                    temp_min += data[i].temp_min
-                    wind_sum += data[i].wind
-                    // @ts-ignore
-                    weather[data[i].weather] += 1
-
-                    if (isLastDay(data[i].date)) {
-                        arr.push({
-                            date: data[i].date,
-                            precipitation: Number((pr_sum / total_days).toFixed(2)),
-                            temp_max: Number((temp_max / total_days).toFixed(2)),
-                            temp_min: Number((temp_min / total_days).toFixed(2)),
-                            wind: Number((wind_sum / total_days).toFixed(2)),
-                            // @ts-ignore
-                            weather:  Object.keys(weather).reduce((a, b) => (weather[a] > weather[b] ? a : b)),
-                        });
-                        total_days = 0;
-                        pr_sum = 0.0;
-                        temp_max = 0.0;
-                        temp_min = 0.0;
-                        wind_sum = 0.0;
-                        weather.rain = 0;
-                        weather.snow = 0;
-                        weather.drizzle = 0;
-                        weather.sun = 0;
-                        weather.fog = 0;
-                    }
-                }
-            }
-
-            return arr
         }
+        let total_days = 0
+        let pr_sum = 0
+        let temp_max = 0
+        let temp_min = 0
+        let wind_sum = 0
+        let arr: IDataShape[] = []
+        let weather = {
+            fog: 0,
+            rain: 0,
+            snow: 0,
+            drizzle: 0,
+            sun: 0,
+        }
+        for (let i = 0; i < data.length; i++) {
+            if (0 === data[i].date.length) continue;
+            total_days += 1
+            pr_sum += data[i].precipitation
+            temp_max += data[i].temp_max
+            temp_min += data[i].temp_min
+            wind_sum += data[i].wind
+            // @ts-ignore
+            weather[data[i].weather] += 1
+            if (isLastDayOf(data[i].date, sortBy)) {
+                // @ts-ignore
+                arr.push({
+                    date: data[i].date,
+                    precipitation: Number((pr_sum / total_days).toFixed(2)),
+                    temp_max: Number((temp_max / total_days).toFixed(2)),
+                    temp_min: Number((temp_min / total_days).toFixed(2)),
+                    wind: Number((wind_sum / total_days).toFixed(2)),
+                    // @ts-ignore
+                    weather:  Object.keys(weather).reduce((a, b) => (weather[a] > weather[b] ? a : b)),
+                });
+                total_days = 0;
+                pr_sum = 0.0;
+                temp_max = 0.0;
+                temp_min = 0.0;
+                wind_sum = 0.0;
+                weather.rain = 0;
+                weather.snow = 0;
+                weather.drizzle = 0;
+                weather.sun = 0;
+                weather.fog = 0;
+            }
+        }
+        return arr
+
     }, [data, sortBy]);
-
-
     if (data.length > 0) {
         return (
             <>
